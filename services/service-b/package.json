@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "main": "src/worker.js",
   "scripts": {
-    "start": "node src/worker.js"
+    "start": "node src/worker.js",
+    "dev": "nodemon src/worker.js"
   },
   "dependencies": {
     "ioredis": "^5.0.0",

@@ -7,22 +7,25 @@ services:
 
   service-a:
     build: ./services/service-a
-    depends_on: [redis]
     environment:
       - REDIS_HOST=redis
+    depends_on:
+      - redis
     ports:
       - "3000:3000"
 
   service-b:
     build: ./services/service-b
-    depends_on: [redis]
     environment:
       - REDIS_HOST=redis
+    depends_on:
+      - redis
 
   service-c:
     build: ./services/service-c
-    depends_on: [redis]
     environment:
       - REDIS_HOST=redis
+    depends_on:
+      - redis
     ports:
       - "4000:4000"
