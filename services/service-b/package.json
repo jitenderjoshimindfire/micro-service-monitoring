@@ -1,15 +1,15 @@
 {
-  "name": "service-b",
-  "version": "0.1.0",
-  "main": "src/worker.js",
+  "name": "service-b-worker",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "node src/worker.js",
-    "dev": "nodemon src/worker.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "ioredis": "^5.0.0",
-    "prom-client": "^14.0.1",
-    "bcryptjs": "^2.4.3",
-    "express": "^4.18.2"
+    "bcrypt": "^5.1.1",
+    "express": "^4.21.1",
+    "ioredis": "^5.4.1",
+    "prom-client": "^15.1.1"
   }
 }

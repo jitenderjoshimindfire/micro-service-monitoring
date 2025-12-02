@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-c
+  namespace: monitoring-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-c
+  template:
+    metadata:
+      labels:
+        app: service-c
+    spec:
+      containers:
+        - name: service-c
+          image: your-dockerhub-username/service-c:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: REDIS_HOST
+              value: redis
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-c
+  namespace: monitoring-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: service-c
+  ports:
+    - name: http
+      port: 4000
+      targetPort: 4000

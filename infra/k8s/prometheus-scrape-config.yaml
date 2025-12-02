@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-prometheus-scrape-config
+  labels:
+    release: prometheus
+data:
+  additional-scrape-configs.yaml: |
+    - job_name: 'service-b'
+      static_configs:
+      - targets: ['service-b:9100']
+
+    - job_name: 'service-c'
+      static_configs:
+      - targets: ['service-c:4000']

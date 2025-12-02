@@ -1,70 +1,118 @@
-const Redis = require("ioredis");
-const express = require("express");
-const client = require("prom-client");
+import express from "express";
+import Redis from "ioredis";
+import bcrypt from "bcrypt";
+import client from "prom-client";
 
-const redis = new Redis({ host: process.env.REDIS_HOST || "redis" });
+const app = express();
 
+const redisHost = process.env.REDIS_HOST || "redis";
+const redisPort = process.env.REDIS_PORT || 6379;
+const redis = new Redis({ host: redisHost, port: redisPort });
+
+// Prometheus metrics
 const register = new client.Registry();
-const jobsTotal = new client.Counter({
+client.collectDefaultMetrics({ register });
+
+const jobsProcessed = new client.Counter({
   name: "jobs_processed_total",
-  help: "jobs processed",
+  help: "Total number of jobs processed by worker",
 });
 const jobErrors = new client.Counter({
   name: "job_errors_total",
-  help: "job errors",
+  help: "Total number of job processing errors",
 });
-const jobDuration = new client.Histogram({
+const jobProcessingTime = new client.Histogram({
   name: "job_processing_time_seconds",
-  help: "job time",
+  help: "Job processing time in seconds",
   buckets: [0.1, 0.5, 1, 2, 5, 10],
 });
 
-register.registerMetric(jobsTotal);
+register.registerMetric(jobsProcessed);
 register.registerMetric(jobErrors);
-register.registerMetric(jobDuration);
-client.collectDefaultMetrics({ register });
+register.registerMetric(jobProcessingTime);
 
-const app = express();
+// CPU‑intensive helpers
+function calcPrimes(limit = 100000) {
+  const primes = [];
+  for (let i = 2; i <= limit; i++) {
+    let isPrime = true;
+    const sqrt = Math.sqrt(i);
+    for (let j = 2; j <= sqrt; j++) {
+      if (i % j === 0) {
+        isPrime = false;
+        break;
+      }
+    }
+    if (isPrime) primes.push(i);
+  }
+  return primes.length;
+}
+
+async function doBcrypt() {
+  const saltRounds = 10;
+  return bcrypt.hash("some_random_string", saltRounds);
+}
+
+function sortArray(n = 100000) {
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    arr.push(Math.floor(Math.random() * n));
+  }
+  arr.sort((a, b) => a - b);
+  return arr[0];
+}
+
+async function processJob(job) {
+  const start = Date.now();
+  let result;
+  try {
+    if (job.type === "bcrypt") {
+      result = await doBcrypt();
+    } else if (job.type === "sort") {
+      result = sortArray();
+    } else {
+      result = calcPrimes();
+    }
+    const duration = (Date.now() - start) / 1000;
+    jobProcessingTime.observe(duration);
+    jobsProcessed.inc();
+
+    await redis.hset("jobs_status", job.id, "completed");
+    await redis.hset(
+      "jobs_result",
+      job.id,
+      JSON.stringify({ type: job.type, result, duration })
+    );
+  } catch (err) {
+    jobErrors.inc();
+    await redis.hset("jobs_status", job.id, "failed");
+  }
+}
+
+// Simple polling loop
+async function workerLoop() {
+  while (true) {
+    try {
+      const item = await redis.brpop("jobs_queue", 5); // block 5s
+      if (item) {
+        const [, payload] = item;
+        const job = JSON.parse(payload);
+        await processJob(job);
+      }
+    } catch (err) {
+      jobErrors.inc();
+    }
+  }
+}
+workerLoop();
+
+// /metrics endpoint
 app.get("/metrics", async (req, res) => {
   res.set("Content-Type", register.contentType);
   res.end(await register.metrics());
 });
-app.listen(process.env.METRICS_PORT || 9100);
 
-// Worker loop
-async function processJob(job) {
-  const end = jobDuration.startTimer();
-  try {
-    // Example CPU-intensive: compute primes or sort a large array
-    const n = 100000;
-    // simple CPU-heavy simulation
-    const arr = Array.from({ length: n }, (_, i) =>
-      Math.floor(Math.random() * n)
-    );
-    arr.sort((a, b) => a - b);
-    // store result (or small summary)
-    await redis.set(
-      `jobs:result:${job.id}`,
-      JSON.stringify({ summary: "sorted", len: arr.length })
-    );
-    jobsTotal.inc();
-    await redis.incr("stats:total_jobs_completed");
-    end();
-  } catch (err) {
-    jobErrors.inc();
-    console.error("job error", err);
-    end();
-  }
-}
-
-async function workerLoop() {
-  while (true) {
-    // BRPOP blocks until an item is available (with timeout)
-    const item = await redis.brpop("jobs:queue", 0); // [queue, payload]
-    if (!item) continue;
-    const payload = JSON.parse(item[1]);
-    await processJob(payload);
-  }
-}
-// start
-workerLoop().catch(console.error);
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Service B worker metrics on ${port}`);
+});

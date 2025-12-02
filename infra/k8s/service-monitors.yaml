@@ -1,0 +1,37 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: service-b-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring-demo
+  selector:
+    matchLabels:
+      app: service-b
+  endpoints:
+    - port: "http"
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: service-c-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring-demo
+  selector:
+    matchLabels:
+      app: service-c
+  endpoints:
+    - port: "http"
+      path: /metrics
+      interval: 15s
